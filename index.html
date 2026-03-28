@@ -35,9 +35,7 @@ input { width:100%; padding:10px; margin-bottom:10px; background:black; color:wh
 
 <div class="container">
 <h2>📖 The Library That Remembers You</h2>
-<input id="nameInput" placeholder="Enter your name" />
-<button onclick="saveName()">Begin</button>
-<button onclick="catchUp()">⏩ Catch Up (Skip Weeks)</button>
+<input id="nameInput" placeholder="Enter your name and press Enter" />
 <p id="welcome"></p>
 <p id="recap" class="recap"></p>
 <p id="story"></p>
@@ -46,6 +44,89 @@ input { width:100%; padding:10px; margin-bottom:10px; background:black; color:wh
 </div>
 
 <script>
+
+function showChoiceReveal(current, choice, nextNode, today) {
+  // Hide story and choice buttons
+  document.getElementById("story").style.display = "none";
+  document.getElementById("choices").style.display = "none";
+  document.getElementById("recap").style.display = "none";
+
+  // Create a reveal div
+  const revealDiv = document.createElement("div");
+  revealDiv.id = "choiceReveal";
+  revealDiv.style.marginTop = "20px";
+  revealDiv.style.border = "1px solid darkred";
+  revealDiv.style.padding = "10px";
+  revealDiv.style.borderRadius = "10px";
+
+  const choiceText = storyTree[current].choices[choice].text;
+  revealDiv.innerHTML = `<h3>Your Choice:</h3><p>${choiceText}</p>`;
+
+  // If next chapter is unlocked, show Continue button
+  if(today >= weekReleaseDates[nextNode]){
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "Continue the Story →";
+    nextBtn.onclick = () => {
+      // Proceed to next node
+      path.push({from: current, choice});
+      localStorage.setItem("path", JSON.stringify(path));
+      currentNode = nextNode;
+      localStorage.setItem("node", currentNode);
+      localStorage.setItem("maxNode", currentNode);
+
+      // Restore main story view
+      document.getElementById("story").style.display = "block";
+      document.getElementById("choices").style.display = "block";
+      document.getElementById("recap").style.display = "block";
+      revealDiv.remove();
+
+      render();
+    };
+    revealDiv.appendChild(nextBtn);
+  } else {
+    const waitMsg = document.createElement("p");
+    waitMsg.textContent = "⏳ The next chapter is not yet available! Come back when it's released.";
+    revealDiv.appendChild(waitMsg);
+  }
+
+  document.querySelector(".container").appendChild(revealDiv);
+}
+
+function showStartOptions() {
+  const startDiv = document.createElement("div");
+  startDiv.id = "startOptions";
+  document.querySelector(".container").insertBefore(startDiv, document.getElementById("welcome"));
+
+  const today = new Date();
+  const savedName = localStorage.getItem("username");
+  const savedNode = localStorage.getItem("node") || "week1";
+
+  // Start from beginning
+  const startBtn = document.createElement("button");
+  startBtn.textContent = "Start from the Beginning";
+  startBtn.onclick = () => {
+    currentNode = "week1";
+    path = [];
+    localStorage.setItem("node", currentNode);
+    localStorage.setItem("path", JSON.stringify(path));
+    localStorage.setItem("stats", JSON.stringify({curiosity:0,risk:0,control:0}));
+    startDiv.style.display = "none";
+    render();
+  };
+  startDiv.appendChild(startBtn);
+
+  // Resume where left off (if released)
+  if (today >= weekReleaseDates[savedNode]) {
+    const resumeBtn = document.createElement("button");
+    resumeBtn.textContent = "Resume where you left off";
+    resumeBtn.onclick = () => {
+      currentNode = savedNode;
+      startDiv.style.display = "none";
+      render();
+    };
+    startDiv.appendChild(resumeBtn);
+  }
+}
 
 function playSound(){
   new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg").play();
@@ -62,221 +143,362 @@ function updateStats(choice){
 
 // 🔥 STORY WITH SECRET PATHS + EXTRA ENDINGS
 const storyTree = {
-week1:{text:`📍 You awaken in a vast library 📚 filled with books of your life.`,choices:{A:{text:"📖 Open a book.",next:"week2"},B:{text:"🚪 Search exit.",next:"week2b"}}},
-week2:{text:`The book writes your future.`,choices:{A:{text:"👁️ Read more.",next:"week3"},B:{text:"🔥 Close it.",next:"week3b"}}},
-week2b:{text:`The library loops endlessly.`,choices:{A:{text:"🧭 Explore deeper.",next:"week3"},B:{text:"👂 Listen.",next:"week3b"}}},
-week3:{text:`A voice calls your name.`,choices:{A:{text:"➡️ Follow.",next:"week4"},B:{text:"⛔ Ignore.",next:"secret1"}}},
-week3b:{text:`Something hunts you.`,choices:{A:{text:"🏃 Run.",next:"week4"},B:{text:"🧍 Face it.",next:"week4b"}}},
-
-// 🔐 SECRET PATH
-secret1:{text:`👁️ You broke the pattern. The library hesitates...`,choices:{A:{text:"Step into the unknown.",next:"secret2"}}},
-secret2:{text:`You find a hidden control room controlling all stories.`,choices:{A:{text:"Take control.",next:"end_secret"},B:{text:"Destroy it.",next:"end_destroy"}}},
-
-week4:{text:`A staircase descends.`,choices:{A:{text:"Go down.",next:"week5"},B:{text:"Stay.",next:"week5b"}}},
-week4b:{text:`Walls move around you.`,choices:{A:{text:"Touch.",next:"week5"},B:{text:"Leave.",next:"week5b"}}},
-
-week5:{text:`A heartbeat door pulses ❤️.`,choices:{A:{text:"Open.",next:"week6"},B:{text:"Leave.",next:"week6b"}}},
-week5b:{text:`Books fall violently.`,choices:{A:{text:"Hide.",next:"week6"},B:{text:"Run.",next:"week6b"}}},
-
-week6:{text:`You see yourself trapped.`,choices:{A:{text:"Free them.",next:"week7"},B:{text:"Leave.",next:"week7b"}}},
-week6b:{text:`Shadows surround you.`,choices:{A:{text:"Fight.",next:"week7"},B:{text:"Hide.",next:"week7b"}}},
-
-week7:{text:`Reality cracks.`,choices:{A:{text:"Accept.",next:"week8"},B:{text:"Resist.",next:"week8b"}}},
-week7b:{text:`Your voice warns you.`,choices:{A:{text:"Listen.",next:"week8"},B:{text:"Ignore.",next:"week8b"}}},
-
-week8:{text:`The library watches 👁️.`,choices:{A:{text:"Speak.",next:"week9"},B:{text:"Escape.",next:"week9b"}}},
-week8b:{text:`Reality twists.`,choices:{A:{text:"Hold on.",next:"week9"},B:{text:"Let go.",next:"week9b"}}},
-
-week9:{text:`It offers power.`,choices:{A:{text:"Accept.",next:"week10"},B:{text:"Refuse.",next:"week10b"}}},
-week9b:{text:`You fall forever.`,choices:{A:{text:"Scream.",next:"week10"},B:{text:"Silent.",next:"week10b"}}},
-
-week10:{text:`Reality bends.`,choices:{A:{text:"Change past.",next:"week11"},B:{text:"Change future.",next:"week11b"}}},
-week10b:{text:`You fade.`,choices:{A:{text:"Fight.",next:"week11"},B:{text:"Let go.",next:"week11b"}}},
-
-week11:{text:`Memories shift.`,choices:{A:{text:"Keep.",next:"week12"},B:{text:"Erase.",next:"week12b"}}},
-week11b:{text:`You merge with shelves.`,choices:{A:{text:"Resist.",next:"week12"},B:{text:"Accept.",next:"week12b"}}},
-
-week12:{text:`Others trapped.`,choices:{A:{text:"Help.",next:"week13"},B:{text:"Ignore.",next:"week13b"}}},
-week12b:{text:`You forget yourself.`,choices:{A:{text:"Search.",next:"week13"},B:{text:"Give up.",next:"week13b"}}},
-
-week13:{text:`Escape for one.`,choices:{A:{text:"Take it.",next:"week14"},B:{text:"Refuse.",next:"week14b"}}},
-week13b:{text:`You fade away.`,choices:{A:{text:"Fight.",next:"week14"},B:{text:"Accept.",next:"week14b"}}},
-
-week14:{text:`Final door 🚪.`,choices:{A:{text:"Open.",next:"week15"},B:{text:"Stay.",next:"week15b"}}},
-week14b:{text:`Collapse begins.`,choices:{A:{text:"Hold.",next:"week15"},B:{text:"Let go.",next:"week15b"}}},
-
-week15:{text:`Truth revealed.`,choices:{A:{text:"Accept.",next:"end1"},B:{text:"Reject.",next:"end2"}}},
-week15b:{text:`You never existed.`,choices:{A:{text:"Accept.",next:"end3"},B:{text:"Reject.",next:"end4"}}},
-
-// 🎬 MULTIPLE ENDINGS (EXPANDED + DRAMATIC)
-end1:{text:`📚 You feel it the moment you accept.
-
-The shelves stop feeling foreign.
-
-They recognize you.
-
-Every book begins to whisper at once — thousands of lives, thousands of choices — all flowing into you.
-
-Your memories stretch beyond your own.
-
-You are no longer reading stories.
-
-You are *holding them together*.
-
-👁️ And somewhere… far away… you feel someone else enter the library.
-
-Waiting.
-
-Just like you once did.`},
-
-end2:{text:`🌫️ You run.
-
-The door slams behind you as light floods your vision.
-
-Cold air fills your lungs — real air.
-
-You made it.
-
-But something is wrong.
-
-Your reflection in the nearest window… lags behind you.
-
-👁️ It smiles.
-
-You didn’t escape the library.
-
-The library escaped with you.`},
-
-end3:{text:`👁️ You let go.
-
-Your name fades first.
-
-Then your voice.
-
-Then the idea that you were ever here at all.
-
-The library quietly closes the book that was you.
-
-No one will read it again.
-
-No one will remember.
-
-And yet…
-
-For a brief moment…
-
-You swear something remembered *you*.`},
-
-end4:{text:`⚠️ You reject everything.
-
-The truth. The rules. The story itself.
-
-The library trembles.
-
-Shelves collapse. Words unravel. Reality tears like paper.
-
-You feel it breaking apart around you.
-
-Or… because of you.
-
-💥 With one final rupture —
-
-Everything goes silent.
-
-No library.
-
-No world.
-
-No you.
-
-Only the echo of a choice that should never have been made.`},
-
-end_secret:{text:`👑 You step into the control room.
-
-Screens flicker to life — every version of every choice.
-
-Every path. Every ending. Every player.
-
-You see them all.
-
-You understand it now.
-
-This was never a prison.
-
-It was a system.
-
-And now… it belongs to you.
-
-With a single thought, you rewrite a life.
-
-With another… you erase one.
-
-👁️ Somewhere, someone opens a book…
-
-And unknowingly…
-
-They are reading *your* story.`},
-
-end_destroy:{text:`💥 You pull the core apart.
-
-The control room screams — not in sound, but in feeling.
-
-The system collapses instantly.
-
-Books ignite.
-
-Shelves disintegrate.
-
-Reality fractures beyond repair.
-
-For a moment… you feel powerful.
-
-Free.
-
-Victorious.
-
-Then you realize the truth.
-
-The library wasn’t containing you.
-
-It was containing *everything*.
-
-🌌 As existence folds in on itself…
-
-You are the last thing left.
-
-And then…
-
-Nothing.`}
+  week1: {
+    text: `📍 You awaken in a vast library, the walls stretching beyond sight. Dust motes dance in the dim red glow as books hum softly around you. Every shelf seems to whisper your name, every spine a story you vaguely remember. A chill runs down your spine, as though the library itself is alive, judging your presence. Shadows shift unnaturally in corners, hinting at secrets best left undiscovered. The scent of old paper and ink mixes with something metallic, almost like blood. You realize you are not here by accident; this place waits for you.`,
+    choices: {
+      A: { text: "📖 Open a book.", next: "week2", extra: `As you open the book, the pages writhe beneath your fingers. Words shimmer and twist, revealing not just stories but glimpses of futures you could never have imagined. Your curiosity prickles with both fear and excitement.` },
+      B: { text: "🚪 Search the exit.", next: "week2b", extra: `The exit looms faintly at the edge of your vision, but each step feels like treading through layers of memory and deception. The door might free you—or trap you deeper within.` }
+    }
+  },
+
+  week2: {
+    text: `The book you opened begins to write your future before your eyes. Every choice you thought was free feels preordained, every paragraph a warning or a temptation. Flickers of shadows dance across the pages, hinting at danger if you read too fast. A cold draft whispers threats you cannot decipher. You are both the observer and the participant, feeling a creeping anxiety that makes your heart pound. Some truths are enticing; others are horrifying.`,
+    choices: {
+      A: { text: "👁️ Read more.", next: "week3", extra: `As you delve deeper, the letters burn into your vision. The library seems to lean closer, watching your reactions. Your curiosity battles your dread, and a strange exhilaration pulses through your veins.` },
+      B: { text: "🔥 Close it.", next: "week3b", extra: `You slam the book shut, but the echoes of its words linger. The shadows in the room seem to sigh in disappointment. You feel the weight of paths not taken pressing against your chest.` }
+    }
+  },
+
+  week2b: {
+    text: `The library loops endlessly, corridors folding back into themselves. Whispered voices mock your attempts to escape, hinting at betrayals in your own past. Each step you take seems known to someone—or something—watching. The air tastes of ash and forgotten promises. You sense that curiosity might save you, yet also damn you.`,
+    choices: {
+      A: { text: "🧭 Explore deeper.", next: "week3", extra: `Venturing further, the books themselves shift positions, creating a maze of stories. You feel as if the library is testing your resolve, daring you to continue.` },
+      B: { text: "👂 Listen.", next: "week3b", extra: `Pausing, you catch whispers in languages you almost know. Each sound hints at events you cannot yet comprehend, sending shivers down your spine.` }
+    }
+  },
+
+  week3: {
+    text: `A voice calls your name, echoing from all directions. The sound is familiar yet alien, comforting yet threatening. It seems to come from inside you as much as from the walls. You feel a tug toward an unknown purpose. Every shadow becomes a possibility, every corner a decision that could change everything.`,
+    choices: {
+      A: { text: "➡️ Follow.", next: "week4", extra: `Stepping forward, the floorboards hum beneath your feet. The library seems to lean toward you, guiding and warning in equal measure. You sense something important awaits.` },
+      B: { text: "⛔ Ignore.", next: "secret1", extra: `Ignoring the voice, the air thickens, pressing in on your senses. You feel both cowardice and relief, unsure which will dominate.` }
+    }
+  },
+
+  week3b: {
+    text: `Something hunts you, unseen yet omnipresent. The sound of shifting shelves and whispered footsteps surround you. Panic claws at your chest as you realize escape might be impossible. The library has a rhythm, and you are now part of its game. Each choice could be your last.`,
+    choices: {
+      A: { text: "🏃 Run.", next: "week4", extra: `You dash through the aisles, knocking over books that scream silently. The shadows chase and slip between your feet, teasing and threatening in equal measure.` },
+      B: { text: "🧍 Face it.", next: "week4b", extra: `Standing your ground, you feel the presence closing in. Your courage hums in resonance with the library itself, daring the darkness to act.` }
+    }
+  },
+
+  week4: {
+    text: `A staircase descends into darkness, spiraling as if into another dimension. Faint red light flickers along the steps, casting long shadows that twist unnaturally. The air smells of smoke and secrets. Every step you take echoes, reminding you that someone—or something—watches. Hesitation might cost more than action.`,
+    choices: {
+      A: { text: "Go down.", next: "week5", extra: `Descending, you hear whispers of past lives and lost opportunities. The staircase seems alive, reacting to your fear and courage.` },
+      B: { text: "Stay.", next: "week5b", extra: `Remaining on the platform, the library murmurs around you, tempting you with promises of knowledge and power if you dare move.` }
+    }
+  },
+
+  week4b: {
+    text: `Walls shift and breathe like a living organism. You feel watched from every angle. The air is thick with anticipation, the scent of old paper mixed with decay. Your intuition warns of unseen consequences. You wonder if standing still is safer than action, yet the library does not allow stagnation.`,
+    choices: {
+      A: { text: "Touch.", next: "week5", extra: `Reaching out, the walls pulse against your fingertips. You sense memories embedded within the masonry, stories begging to be released.` },
+      B: { text: "Leave.", next: "week5b", extra: `Backing away, the walls recoil slightly, almost disappointed. You realize your presence has left a mark.` }
+    }
+  },
+
+  week5: {
+    text: `A heartbeat door pulses with life, red and unrelenting. It seems to breathe in sync with your own heart. Every beat echoes in your chest, reminding you of choices yet unmade. Behind it, unknown possibilities and dangers await. You feel the pull of curiosity stronger than caution.`,
+    choices: {
+      A: { text: "Open.", next: "week6", extra: `The door creaks open, revealing a hallway of mirrors reflecting not just you, but versions of yourself that could have been. The library watches your reaction closely.` },
+      B: { text: "Leave.", next: "week6b", extra: `Turning away, you feel the pull of what could have been. Regret lingers like a shadow over your shoulder.` }
+    }
+  },
+
+  week5b: {
+    text: `Books fall violently around you, as if the library is angry. Dust clouds choke the air. The floor vibrates with unread stories, warnings unheeded. You realize that inaction has consequences as tangible as action.`,
+    choices: {
+      A: { text: "Hide.", next: "week6", extra: `You duck behind a massive shelf, feeling the tremors through the floor. From your hiding place, whispers tease and warn.` },
+      B: { text: "Run.", next: "week6b", extra: `You sprint, knocking over tomes that scream silently. Your heart races as the library responds to your fear.` }
+    }
+  },
+
+  week6: {
+    text: `You see yourself trapped in a mirror. Your reflection moves independently, pleading silently. The air thickens, and a faint chanting fills the room. You realize your actions have consequences beyond the physical.`,
+    choices: {
+      A: { text: "Free them.", next: "week7", extra: `Reaching through the mirror, your hand passes through cold glass. You sense the reflection's gratitude mingled with fear. The library seems intrigued.` },
+      B: { text: "Leave.", next: "week7b", extra: `You step away, the reflection's eyes following you. A pang of guilt hits, but the library seems to respect your choice.` }
+    }
+  },
+
+  week6b: {
+    text: `Shadows coalesce around you, whispering doubts and fears. Every corner hides possibilities you dare not see. Your heartbeat quickens as unseen eyes track your every move. Courage and caution fight for dominance.`,
+    choices: {
+      A: { text: "Fight.", next: "week7", extra: `You step into the shadows, hands outstretched. The darkness flinches, revealing glimpses of hidden truths.` },
+      B: { text: "Hide.", next: "week7b", extra: `You retreat into the shadows, blending with the darkness. You feel both safety and isolation as the library observes.` }
+    }
+  },
+
+  week7: {
+    text: `Reality cracks around you. Walls ripple like water, floors bend unnaturally. A low hum vibrates through the air, unsettling every nerve. You sense that decisions now carry irreversible weight.`,
+    choices: {
+      A: { text: "Accept.", next: "week8", extra: `Embracing the chaos, your mind expands with understanding. The library hums in recognition, approving your courage.` },
+      B: { text: "Resist.", next: "week8b", extra: `You struggle against the warped reality. Your defiance sends ripples through the space, angering unseen forces.` }
+    }
+  },
+
+  week7b: {
+    text: `Your voice warns you of impending danger. The echoes are distorted, filled with urgency and dread. Every step seems measured by unseen forces. You are being tested.`,
+    choices: {
+      A: { text: "Listen.", next: "week8", extra: `Heeding the whispers, you navigate carefully, sensing where danger lies and where opportunity waits.` },
+      B: { text: "Ignore.", next: "week8b", extra: `Ignoring the warnings, you charge forward. The library quivers in response, noting your boldness or folly.` }
+    }
+  },
+
+  week8: {
+    text: `The library watches, alive and sentient. Books hover, pages fluttering as if breathing. Every move is observed, every choice cataloged. You sense that even your thoughts are not entirely your own.`,
+    choices: {
+      A: { text: "Speak.", next: "week9", extra: `Your words echo in the space, resonating with hidden energies. Some answers come, others hide, leaving you thirsting for more knowledge.` },
+      B: { text: "Escape.", next: "week9b", extra: `You attempt to flee, but the library subtly redirects your path. Every exit seems to shift, teasing and challenging.` }
+    }
+  },
+
+  week8b: {
+    text: `Reality twists unnaturally. Time stretches and compresses. Shadows behave unpredictably, reflecting your inner fears. Every choice feels simultaneously crucial and inconsequential.`,
+    choices: {
+      A: { text: "Hold on.", next: "week9", extra: `Clinging to something familiar, you anchor yourself as the world distorts. You feel fleeting relief.` },
+      B: { text: "Let go.", next: "week9b", extra: `Releasing your grip, you surrender to the chaos. Strange serenity washes over you, but at a cost.` }
+    }
+  },
+
+  week9: {
+    text: `It offers power. Not just knowledge, but influence over the unseen mechanics of existence. Your hands twitch with temptation. Fear whispers that such power is both intoxicating and dangerous. Every choice is weighted by morality and consequence.`,
+    choices: {
+      A: { text: "Accept.", next: "week10", extra: `You feel a rush as unseen threads align with your intentions. The library hums with approval and caution.` },
+      B: { text: "Refuse.", next: "week10b", extra: `You push away the offer, feeling a strange emptiness. The library watches silently, neither approving nor condemning.` }
+    }
+  },
+
+  week9b: {
+    text: `You fall forever, suspended in a liminal void. Stars and shadows swirl indistinguishably. Fear and awe mingle. You realize that some choices cannot be undone, and some knowledge comes at unbearable cost.`,
+    choices: {
+      A: { text: "Scream.", next: "week10", extra: `Your cry echoes through the void, rattling unseen structures. A shiver of recognition passes through you.` },
+      B: { text: "Silent.", next: "week10b", extra: `You remain silent, observing the infinite swirl. The library records your restraint.` }
+    }
+  },
+
+  week10: {
+    text: `Reality bends. Past and future twist around you like ribbons. Memories bleed into one another. You feel omnipotent and terrified simultaneously. Every action is magnified, every thought consequential.`,
+    choices: {
+      A: { text: "Change past.", next: "week11", extra: `Altering a memory, you feel a shiver of dissonance. What was, was no longer, and what might be trembles.` },
+      B: { text: "Change future.", next: "week11b", extra: `You attempt to shift what has yet to occur, sending ripples of possibility throughout the library. The results are unknown.` }
+    }
+  },
+
+  week10b: {
+    text: `You fade. Not just physically, but in memory and essence. The library seems indifferent, cataloging your absence. Shadows whisper your name, questioning your choice.`,
+    choices: {
+      A: { text: "Fight.", next: "week11", extra: `Fighting against the fading, you claw at the edges of your reality. Some part of you persists.` },
+      B: { text: "Let go.", next: "week11b", extra: `Surrendering, you allow yourself to dissipate. The library notes your acquiescence, recording for eternity.` }
+    }
+  },
+
+  week11: {
+    text: `Memories shift around you like living specters. Familiar faces distort, places warp unnaturally. You feel the pull of empathy and selfishness simultaneously. The weight of choice grows unbearable.`,
+    choices: {
+      A: { text: "Keep.", next: "week12", extra: `Preserving a memory, you feel warmth and fear intertwined. The library acknowledges your resolve.` },
+      B: { text: "Erase.", next: "week12b", extra: `Erasing, you sense a pang of loss, even as a relief blooms. Shadows sigh softly, taking note.` }
+    }
+  },
+
+  week11b: {
+    text: `You merge with shelves, becoming one with the library’s essence. Whispers of your thoughts intertwine with the books. You are both observer and participant, a ghost among pages.`,
+    choices: {
+      A: { text: "Resist.", next: "week12", extra: `Trying to pull away, you strain against the shelves. Part of you remains tethered.` },
+      B: { text: "Accept.", next: "week12b", extra: `You surrender fully, feeling a strange completeness. The library hums in quiet approval.` }
+    }
+  },
+
+  week12: {
+    text: `Others trapped wander the corridors, their eyes empty yet searching. You feel the responsibility of guiding or ignoring them. Morality and curiosity war inside your mind. Every step echoes consequences.`,
+    choices: {
+      A: { text: "Help.", next: "week13", extra: `Leading someone safely, you feel their gratitude and fear mingled. The library notes your benevolence.` },
+      B: { text: "Ignore.", next: "week13b", extra: `Passing by, you feel the weight of indifference. Shadows whisper your judgment.` }
+    }
+  },
+
+  week12b: {
+    text: `You forget yourself. Your name slips from memory, your essence dims. Yet the library holds every trace, watching silently. You are present yet absent.`,
+    choices: {
+      A: { text: "Search.", next: "week13", extra: `Attempting to recall fragments, you find fleeting glimpses of yourself. The library seems amused.` },
+      B: { text: "Give up.", next: "week13b", extra: `You let memory fade completely. A chilling calm envelops you.` }
+    }
+  },
+
+  week13: {
+    text: `Escape for one becomes the ultimate temptation. The corridors seem narrower, the walls press closer. You feel both liberation and dread. Choices weigh heavier now.`,
+    choices: {
+      A: { text: "Take it.", next: "week14", extra: `Seizing the chance, you feel exhilaration mixed with guilt. The library hums in quiet recognition.` },
+      B: { text: "Refuse.", next: "week14b", extra: `Walking past, you feel moral righteousness and fear mingling. Shadows respect your decision.` }
+    }
+  },
+
+  week13b: {
+    text: `You fade away, unnoticed and unremarked. Every step you take leaves faint ripples. The library observes silently, cataloging your disappearance.`,
+    choices: {
+      A: { text: "Fight.", next: "week14", extra: `You struggle to leave a mark, to assert presence. The library hums at your effort.` },
+      B: { text: "Accept.", next: "week14b", extra: `You surrender to invisibility. Calm and dread settle equally.` }
+    }
+  },
+
+  week14: {
+    text: `Final door looms. Light spills from beneath, inviting and threatening simultaneously. The air is electric, heavy with anticipation. You feel the weight of all past choices pressing upon you.`,
+    choices: {
+      A: { text: "Open.", next: "week15", extra: `You open the door, and the world beyond glimmers with infinite possibilities. Every choice you made resonates here.` },
+      B: { text: "Stay.", next: "week15b", extra: `Remaining, you feel safety and stagnation intertwine. The library watches patiently.` }
+    }
+  },
+
+  week14b: {
+    text: `Collapse begins. The shelves groan, the floors tremble. Reality frays. You sense imminent endings, the library punishing or testing you.`,
+    choices: {
+      A: { text: "Hold.", next: "week15", extra: `You brace against the chaos, trying to preserve what you can. The library notes your persistence.` },
+      B: { text: "Let go.", next: "week15b", extra: `You release resistance, letting the collapse consume. A strange calm descends.` }
+    }
+  },
+
+  week15: {
+    text: `Truth revealed. Every story, every choice converges here. Knowledge of yourself and the library’s secrets flood your mind. The weight of understanding is almost unbearable. Yet, in this moment, clarity and power are yours.`,
+    choices: {
+      A: { text: "Accept.", next: "end1", extra: `You embrace the revelation, feeling connected to all stories, past and present. The library hums approval.` },
+      B: { text: "Reject.", next: "end2", extra: `You refuse, rebelling against the knowledge. The library reacts, ripples of discontent spreading.` }
+    }
+  },
+
+  week15b: {
+    text: `You never existed. Reality seems to shrug, acknowledging your absence. Shadows and echoes note your departure, quietly recording.`,
+    choices: {
+      A: { text: "Accept.", next: "end3", extra: `You surrender to nonexistence, feeling both relief and sorrow.` },
+      B: { text: "Reject.", next: "end4", extra: `You fight the erasure, struggling to leave traces. The library records your defiance.` }
+    }
+  },
+
+  // Endings remain the same as your original code
+  end1: {
+  text: `📚 You feel it the moment you accept.  
+The shelves tremble, and the whispers of countless lives swirl around you, each one a thread woven into your consciousness.  
+Memories not your own flood your mind, visions of triumph, regret, and love intertwining.  
+You realize the library is not just a place—it is a living record of existence itself.  
+Every story, every choice, converges into you, and you understand your power and responsibility.  
+The air hums with reverence, shadows bowing as if acknowledging your presence.  
+Somewhere, beyond time and space, another soul enters, unaware that you now guide the narrative of all worlds.  
+You are no longer simply reading stories—you are *holding them together*, shaping the course of countless lives.  
+And in that moment, a profound calm settles within you, tempered by awe and awe-striking fear.`
+},
+
+end2: {
+  text: `🌫️ You run, your feet pounding on floors that bend and ripple beneath you.  
+The door slams behind you, sealing away the library’s whispers and mysteries.  
+Cold air hits your face, but relief is fleeting; the shadows trail your every step, silent observers of your defiance.  
+Light floods your vision, yet a chill runs down your spine—you sense the library is still alive, still watching.  
+Your reflection in the nearest window lags unnervingly behind, twisted and mocking.  
+A whisper brushes your ear, reminding you that escape is never complete, that the choices you left unmade still haunt.  
+Fear and exhilaration intermingle as you glance back, the building’s heartbeat faint but unbroken.  
+Though free in body, you remain entangled in the threads of its stories, a pawn aware of the game but unable to leave entirely.  
+And somewhere, the library waits for the next player, as patient and relentless as ever.`
+},
+
+end3: {
+  text: `👁️ You let go, and the world dims around you.  
+Your name fades first, then your voice, then the very essence of your existence.  
+Time stretches strangely, and you feel simultaneously everywhere and nowhere.  
+The books whisper faintly, a lament of lives you might have led, and choices you will never make.  
+The library closes the book that was you, its corridors silent and expectant, as if holding its breath.  
+No one will read your story again; no one will remember, and yet… a subtle awareness lingers.  
+A faint echo brushes your consciousness, suggesting that forgetting is not total, that something always remembers.  
+You drift in this liminal space, a shadow among shadows, feeling loss, peace, and awe at once.  
+And for a fleeting moment, you sense that your journey mattered, even if the world will never know.`
+},
+
+end4: {
+  text: `⚠️ You reject everything.  
+The truth, the rules, the stories themselves—everything collapses around you.  
+Shelves twist, floors rupture, and words unravel in midair, falling like ash.  
+Reality tears apart like fragile paper, and you feel the raw edge of existence slicing against your senses.  
+Every heartbeat is an echo in the void, every breath a defiance against annihilation.  
+Or perhaps it is not defiance, but inevitability—the library absorbs nothing and everyone alike.  
+You sense the universe itself bending, memories unraveling, futures dissolving before your eyes.  
+And in one final moment, silence engulfs all. No library. No world. No you.  
+Only the faintest echo remains, the residue of a choice that should never have been made.`
+},
+
+end_secret: {
+  text: `👑 You step into the control room.  
+Screens flicker to life, each displaying an alternate version of every story, every choice, every ending.  
+You see possibilities that never were and futures that may never come to pass.  
+Power and knowledge surge through you, intoxicating and terrifying in equal measure.  
+The weight of infinite decisions presses against your mind, yet clarity blooms in the chaos.  
+You understand now—the library is not a prison, but a system of infinite narrative threads.  
+With a thought, you can alter destinies, erase mistakes, or rewrite outcomes, holding countless lives in balance.  
+Somewhere, another opens a book, unaware that their story now intersects with yours.  
+You smile, knowing the game has changed forever, and that control is yours to wield wisely—or recklessly.`
+},
+
+end_destroy: {
+  text: `💥 You pull the core apart.  
+The control room screams in silence, every thread of reality quivering and fracturing.  
+Books ignite spontaneously, pages curling into ash as histories collapse into nothingness.  
+Shelves disintegrate, corridors vanish, and the library convulses violently, a universe undone by your hand.  
+A sense of ultimate power surges through you, but it is fleeting, tempered by the enormity of destruction.  
+You feel omnipotent and hollow, victorious and utterly alone.  
+The echoes of every erased choice and story reverberate like distant thunder, reminding you that creation and destruction are inseparable.  
+And then, as the final remnants fade, you understand—the library was never containing you; it was containing *everything*.  
+Now, there is only emptiness, silence, and the faint memory of what once was.`
+}
 };
 
 let currentNode = localStorage.getItem("node") || "week1";
 let path = JSON.parse(localStorage.getItem("path")) || [];
+let maxNode = localStorage.getItem("maxNode") || "week1";
+const weekReleaseDates = {
+  week1: new Date("2026-03-29T09:00:00"),
+  week2: new Date("2026-04-05T09:00:00"),
+  week2b: new Date("2026-04-05T09:00:00"),
+  week3: new Date("2026-04-12T09:00:00"),
+  week3b: new Date("2026-04-12T09:00:00"),
+  week4: new Date("2026-04-19T09:00:00"),
+  week4b: new Date("2026-04-19T09:00:00"),
+  week5: new Date("2026-04-26T09:00:00"),
+  week5b: new Date("2026-04-26T09:00:00"),
+  week6: new Date("2026-05-03T09:00:00"),
+  week6b: new Date("2026-05-03T09:00:00"),
+  week7: new Date("2026-05-10T09:00:00"),
+  week7b: new Date("2026-05-10T09:00:00"),
+  week8: new Date("2026-05-17T09:00:00"),
+  week8b: new Date("2026-05-17T09:00:00"),
+  week9: new Date("2026-05-24T09:00:00"),
+  week9b: new Date("2026-05-24T09:00:00"),
+  week10: new Date("2026-05-31T09:00:00"),
+  week10b: new Date("2026-05-31T09:00:00"),
+  week11: new Date("2026-06-07T09:00:00"),
+  week11b: new Date("2026-06-07T09:00:00"),
+  week12: new Date("2026-06-14T09:00:00"),
+  week12b: new Date("2026-06-14T09:00:00"),
+  week13: new Date("2026-06-21T09:00:00"),
+  week13b: new Date("2026-06-21T09:00:00"),
+  week14: new Date("2026-06-28T09:00:00"),
+  week14b: new Date("2026-06-28T09:00:00"),
+  week15: new Date("2026-07-05T09:00:00"),
+  week15b: new Date("2026-07-05T09:00:00")
+};
 
-function catchUp(){
-  currentNode = "week8";
-  localStorage.setItem("node", currentNode);
-  render();
-}
+document.getElementById("nameInput").addEventListener("keypress", function(e){
+  if(e.key === "Enter"){
+    const name = this.value.trim();
+    if(!name) return alert("Enter name");
+    localStorage.setItem("username", name);
+    showStartOptions();
+  }
+});
 
-function saveName(){
-  const name = document.getElementById("nameInput").value.trim();
-  if(!name) return alert("Enter name");
-  localStorage.setItem("username", name);
-  localStorage.setItem("node","week1");
-  localStorage.setItem("path", JSON.stringify([]));
-  localStorage.setItem("stats", JSON.stringify({curiosity:0,risk:0,control:0}));
-  location.reload();
-}
+function vote(choice) {
+  const nextNode = storyTree[currentNode].choices[choice].next;
+  const today = new Date();
 
-function vote(choice){
-  playSound();
-  updateStats(choice);
-  path.push({from: currentNode, choice});
-  localStorage.setItem("path", JSON.stringify(path));
-  currentNode = storyTree[currentNode].choices[choice].next;
-  localStorage.setItem("node", currentNode);
-  render();
+  // Show the choice reveal screen instead of moving immediately
+  showChoiceReveal(currentNode, choice, nextNode, today);
 }
 
 function render(){
@@ -299,15 +521,23 @@ function render(){
 
   if(node.choices){
     for(let key in node.choices){
-      const btn = document.createElement("button");
-      btn.textContent = node.choices[key].text;
-      btn.onclick = ()=>vote(key);
-      div.appendChild(btn);
+        const btn = document.createElement("button");
+        btn.textContent = node.choices[key].text;
+
+        // If you have extra narrative for choices, show it first
+        btn.onclick = () => {
+            if(node.choices[key].extra) {
+                alert(node.choices[key].extra); // Show the detailed narrative
+            }
+            vote(key); // Then proceed to next node
+        };
+
+        div.appendChild(btn);
     }
-  }
+}
 
   if(!node.choices){
-    document.getElementById("summary").innerHTML = `<h3>🎬 Ending Reached</h3><button onclick='saveName()'>🔄 Replay</button>`;
+    document.getElementById("summary").innerHTML = `<h3>🎬 Ending Reached</h3><button onclick='location.reload()'>🔄 Replay</button>`;
   }
 }
 
