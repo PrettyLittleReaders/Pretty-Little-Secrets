@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📖 The Library That Remembers You</title>
+
+<style>
+body { margin:0; font-family:Georgia, serif; background:black; color:white; overflow:hidden; }
+.container { max-width:650px; margin:auto; padding:16px; position:relative; z-index:2; }
+h2 { color:#ff3b3b; }
+button { width:100%; padding:14px; margin:8px 0; background:black; color:white; border:1px solid darkred; border-radius:10px; }
+input { width:100%; padding:10px; margin-bottom:10px; background:black; color:white; border:1px solid darkred; border-radius:6px; }
+.recap { font-size:14px; opacity:0.85; margin-bottom:10px; }
+.summary { margin-top:20px; border-top:1px solid darkred; padding-top:10px; }
+
+.bg {
+  position:fixed;
+  width:200%; height:200%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,0,0,0.15), transparent),
+              radial-gradient(circle at 70% 70%, rgba(255,255,255,0.05), transparent);
+  animation: moveBg 20s linear infinite;
+  z-index:1;
+}
+@keyframes moveBg {
+  0% { transform: translate(0,0); }
+  50% { transform: translate(-10%, -10%); }
+  100% { transform: translate(0,0); }
+}
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+
+<div class="container">
+<h2>📖 The Library That Remembers You</h2>
+<input id="nameInput" placeholder="Enter your name" />
+<button onclick="saveName()">Begin</button>
+<button onclick="catchUp()">⏩ Catch Up (Skip Weeks)</button>
+<p id="welcome"></p>
+<p id="recap" class="recap"></p>
+<p id="story"></p>
+<div id="choices"></div>
+<div id="summary" class="summary"></div>
+</div>
+
+<script>
+
+function playSound(){
+  new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg").play();
+}
+
+let stats = JSON.parse(localStorage.getItem("stats")) || {curiosity:0,risk:0,control:0};
+
+function updateStats(choice){
+  if(choice === "A") stats.curiosity++;
+  if(choice === "B") stats.risk++;
+  stats.control = stats.curiosity - stats.risk;
+  localStorage.setItem("stats", JSON.stringify(stats));
+}
+
+// 🔥 STORY WITH SECRET PATHS + EXTRA ENDINGS
+const storyTree = {
+week1:{text:`📍 You awaken in a vast library 📚 filled with books of your life.`,choices:{A:{text:"📖 Open a book.",next:"week2"},B:{text:"🚪 Search exit.",next:"week2b"}}},
+week2:{text:`The book writes your future.`,choices:{A:{text:"👁️ Read more.",next:"week3"},B:{text:"🔥 Close it.",next:"week3b"}}},
+week2b:{text:`The library loops endlessly.`,choices:{A:{text:"🧭 Explore deeper.",next:"week3"},B:{text:"👂 Listen.",next:"week3b"}}},
+week3:{text:`A voice calls your name.`,choices:{A:{text:"➡️ Follow.",next:"week4"},B:{text:"⛔ Ignore.",next:"secret1"}}},
+week3b:{text:`Something hunts you.`,choices:{A:{text:"🏃 Run.",next:"week4"},B:{text:"🧍 Face it.",next:"week4b"}}},
+
+// 🔐 SECRET PATH
+secret1:{text:`👁️ You broke the pattern. The library hesitates...`,choices:{A:{text:"Step into the unknown.",next:"secret2"}}},
+secret2:{text:`You find a hidden control room controlling all stories.`,choices:{A:{text:"Take control.",next:"end_secret"},B:{text:"Destroy it.",next:"end_destroy"}}},
+
+week4:{text:`A staircase descends.`,choices:{A:{text:"Go down.",next:"week5"},B:{text:"Stay.",next:"week5b"}}},
+week4b:{text:`Walls move around you.`,choices:{A:{text:"Touch.",next:"week5"},B:{text:"Leave.",next:"week5b"}}},
+
+week5:{text:`A heartbeat door pulses ❤️.`,choices:{A:{text:"Open.",next:"week6"},B:{text:"Leave.",next:"week6b"}}},
+week5b:{text:`Books fall violently.`,choices:{A:{text:"Hide.",next:"week6"},B:{text:"Run.",next:"week6b"}}},
+
+week6:{text:`You see yourself trapped.`,choices:{A:{text:"Free them.",next:"week7"},B:{text:"Leave.",next:"week7b"}}},
+week6b:{text:`Shadows surround you.`,choices:{A:{text:"Fight.",next:"week7"},B:{text:"Hide.",next:"week7b"}}},
+
+week7:{text:`Reality cracks.`,choices:{A:{text:"Accept.",next:"week8"},B:{text:"Resist.",next:"week8b"}}},
+week7b:{text:`Your voice warns you.`,choices:{A:{text:"Listen.",next:"week8"},B:{text:"Ignore.",next:"week8b"}}},
+
+week8:{text:`The library watches 👁️.`,choices:{A:{text:"Speak.",next:"week9"},B:{text:"Escape.",next:"week9b"}}},
+week8b:{text:`Reality twists.`,choices:{A:{text:"Hold on.",next:"week9"},B:{text:"Let go.",next:"week9b"}}},
+
+week9:{text:`It offers power.`,choices:{A:{text:"Accept.",next:"week10"},B:{text:"Refuse.",next:"week10b"}}},
+week9b:{text:`You fall forever.`,choices:{A:{text:"Scream.",next:"week10"},B:{text:"Silent.",next:"week10b"}}},
+
+week10:{text:`Reality bends.`,choices:{A:{text:"Change past.",next:"week11"},B:{text:"Change future.",next:"week11b"}}},
+week10b:{text:`You fade.`,choices:{A:{text:"Fight.",next:"week11"},B:{text:"Let go.",next:"week11b"}}},
+
+week11:{text:`Memories shift.`,choices:{A:{text:"Keep.",next:"week12"},B:{text:"Erase.",next:"week12b"}}},
+week11b:{text:`You merge with shelves.`,choices:{A:{text:"Resist.",next:"week12"},B:{text:"Accept.",next:"week12b"}}},
+
+week12:{text:`Others trapped.`,choices:{A:{text:"Help.",next:"week13"},B:{text:"Ignore.",next:"week13b"}}},
+week12b:{text:`You forget yourself.`,choices:{A:{text:"Search.",next:"week13"},B:{text:"Give up.",next:"week13b"}}},
+
+week13:{text:`Escape for one.`,choices:{A:{text:"Take it.",next:"week14"},B:{text:"Refuse.",next:"week14b"}}},
+week13b:{text:`You fade away.`,choices:{A:{text:"Fight.",next:"week14"},B:{text:"Accept.",next:"week14b"}}},
+
+week14:{text:`Final door 🚪.`,choices:{A:{text:"Open.",next:"week15"},B:{text:"Stay.",next:"week15b"}}},
+week14b:{text:`Collapse begins.`,choices:{A:{text:"Hold.",next:"week15"},B:{text:"Let go.",next:"week15b"}}},
+
+week15:{text:`Truth revealed.`,choices:{A:{text:"Accept.",next:"end1"},B:{text:"Reject.",next:"end2"}}},
+week15b:{text:`You never existed.`,choices:{A:{text:"Accept.",next:"end3"},B:{text:"Reject.",next:"end4"}}},
+
+// 🎬 MULTIPLE ENDINGS (EXPANDED + DRAMATIC)
+end1:{text:`📚 You feel it the moment you accept.
+
+The shelves stop feeling foreign.
+
+They recognize you.
+
+Every book begins to whisper at once — thousands of lives, thousands of choices — all flowing into you.
+
+Your memories stretch beyond your own.
+
+You are no longer reading stories.
+
+You are *holding them together*.
+
+👁️ And somewhere… far away… you feel someone else enter the library.
+
+Waiting.
+
+Just like you once did.`},
+
+end2:{text:`🌫️ You run.
+
+The door slams behind you as light floods your vision.
+
+Cold air fills your lungs — real air.
+
+You made it.
+
+But something is wrong.
+
+Your reflection in the nearest window… lags behind you.
+
+👁️ It smiles.
+
+You didn’t escape the library.
+
+The library escaped with you.`},
+
+end3:{text:`👁️ You let go.
+
+Your name fades first.
+
+Then your voice.
+
+Then the idea that you were ever here at all.
+
+The library quietly closes the book that was you.
+
+No one will read it again.
+
+No one will remember.
+
+And yet…
+
+For a brief moment…
+
+You swear something remembered *you*.`},
+
+end4:{text:`⚠️ You reject everything.
+
+The truth. The rules. The story itself.
+
+The library trembles.
+
+Shelves collapse. Words unravel. Reality tears like paper.
+
+You feel it breaking apart around you.
+
+Or… because of you.
+
+💥 With one final rupture —
+
+Everything goes silent.
+
+No library.
+
+No world.
+
+No you.
+
+Only the echo of a choice that should never have been made.`},
+
+end_secret:{text:`👑 You step into the control room.
+
+Screens flicker to life — every version of every choice.
+
+Every path. Every ending. Every player.
+
+You see them all.
+
+You understand it now.
+
+This was never a prison.
+
+It was a system.
+
+And now… it belongs to you.
+
+With a single thought, you rewrite a life.
+
+With another… you erase one.
+
+👁️ Somewhere, someone opens a book…
+
+And unknowingly…
+
+They are reading *your* story.`},
+
+end_destroy:{text:`💥 You pull the core apart.
+
+The control room screams — not in sound, but in feeling.
+
+The system collapses instantly.
+
+Books ignite.
+
+Shelves disintegrate.
+
+Reality fractures beyond repair.
+
+For a moment… you feel powerful.
+
+Free.
+
+Victorious.
+
+Then you realize the truth.
+
+The library wasn’t containing you.
+
+It was containing *everything*.
+
+🌌 As existence folds in on itself…
+
+You are the last thing left.
+
+And then…
+
+Nothing.`}
+};
+
+let currentNode = localStorage.getItem("node") || "week1";
+let path = JSON.parse(localStorage.getItem("path")) || [];
+
+function catchUp(){
+  currentNode = "week8";
+  localStorage.setItem("node", currentNode);
+  render();
+}
+
+function saveName(){
+  const name = document.getElementById("nameInput").value.trim();
+  if(!name) return alert("Enter name");
+  localStorage.setItem("username", name);
+  localStorage.setItem("node","week1");
+  localStorage.setItem("path", JSON.stringify([]));
+  localStorage.setItem("stats", JSON.stringify({curiosity:0,risk:0,control:0}));
+  location.reload();
+}
+
+function vote(choice){
+  playSound();
+  updateStats(choice);
+  path.push({from: currentNode, choice});
+  localStorage.setItem("path", JSON.stringify(path));
+  currentNode = storyTree[currentNode].choices[choice].next;
+  localStorage.setItem("node", currentNode);
+  render();
+}
+
+function render(){
+  const name = localStorage.getItem("username");
+  if(!name) return;
+
+  document.getElementById("nameInput").style.display="none";
+  document.getElementById("welcome").textContent = `Welcome, ${name}`;
+
+  if(path.length){
+    const last = path[path.length-1];
+    document.getElementById("recap").textContent = `Previously: ${storyTree[last.from].choices[last.choice].text}`;
+  }
+
+  const node = storyTree[currentNode];
+  document.getElementById("story").textContent = node.text;
+
+  const div = document.getElementById("choices");
+  div.innerHTML="";
+
+  if(node.choices){
+    for(let key in node.choices){
+      const btn = document.createElement("button");
+      btn.textContent = node.choices[key].text;
+      btn.onclick = ()=>vote(key);
+      div.appendChild(btn);
+    }
+  }
+
+  if(!node.choices){
+    document.getElementById("summary").innerHTML = `<h3>🎬 Ending Reached</h3><button onclick='saveName()'>🔄 Replay</button>`;
+  }
+}
+
+render();
+</script>
+
+</body>
+</html>
